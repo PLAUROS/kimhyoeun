@@ -129,6 +129,8 @@ svg.i{width:1.35em;height:1.35em;flex:none}
 .route-bar button{border:0;background:none;width:44px;height:44px;display:grid;place-items:center;color:var(--ink);flex:none}
 .route-bar span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .route-bar .from{flex:0 1 auto;color:var(--ink-2)}
+.route-bar em{font-style:normal}
+.route-bar small{font-size:.76em;font-weight:800;color:var(--ink-2);margin-right:.1em}
 .route-bar i{flex:none;font-style:normal;color:var(--ink-2)}
 .route-bar .to{flex:1 1 0}
 .fab.loc{right:.7em;bottom:1.9em;color:var(--blue)}
@@ -852,7 +854,8 @@ function pickRows(){
   return `<div class="ft-r"><i class="dot s"></i><span><small>탑승 위치${m>=10?` · 지금 위치에서 약 ${m}m`:''}</small><b>${pickLabel()}</b></span></div>
     <div class="ft-r extra"><i class="dot e"></i><span><small>도착 · 약 ${fr.km}km · 예상 ${won(carFare(fr.f,S.car))}</small><b>${PLACES[S.dest].n}</b></span></div>`;
 }
-const showPick=()=>{ const e=$('pick-ft'); if(e) e.innerHTML=pickRows(); };
+const barFrom=()=>km(S.pick,HOME)<0.01?'현재 위치':'고른 위치';
+const showPick=()=>{ const e=$('pick-ft'), f=$('bar-from'); if(e) e.innerHTML=pickRows(); if(f) f.textContent=barFrom(); };
 function setPick(p){
   if(S.step!=='origin'||km(p,S.pick)<0.003) return; // 지도를 다시 맞출 때 생기는 아주 작은 차이는 옮긴 것으로 보지 않아요
   S.pick={lat:p.lat,lon:p.lon}; S.pickName='';
@@ -1059,7 +1062,7 @@ function resultHTML(){
 function mapUiHTML(){
   if(S.screen!=='ride') return '';
   let h='';
-  const bar=(act,label)=>`<div class="route-bar"><button data-a="${act}" aria-label="${label}">${I('back')}</button><span class="from">${km(S.pick,HOME)<0.01?'현재 위치':'고른 위치'}</span><i aria-hidden="true">›</i><span class="to">${PLACES[S.dest].n}</span></div>`;
+  const bar=(act,label)=>`<div class="route-bar"><button data-a="${act}" aria-label="${label}">${I('back')}</button><span class="from"><small>출발</small> <em id="bar-from">${barFrom()}</em></span><i aria-hidden="true">›</i><span class="to"><small>도착</small> ${PLACES[S.dest].n}</span></div>`;
   if(S.step==='route') h+=bar('route-back','도착지 다시 고르기');
   if(S.step==='approach') h+=`<button class="cancel-chip" data-a="cancel-ask">호출 취소</button>`;
   if(S.step==='origin') h+=`<div class="center-pin k-pin o"><b>여기서 타요</b><span></span></div>${bar('pick-back','택시 종류 다시 고르기')}`;
