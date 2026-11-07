@@ -9,7 +9,7 @@
 ==========================================================================
  배프 · 택시 부르기 연습 (단독 페이지)
 --------------------------------------------------------------------------
- ■ 팀원이 바꿀 곳: 아래 <script> 맨 위의 CONFIG 하나
+ ■ 팀원이 바꿀 곳: 아래 <script> 맨 위의 CONFIG (Netlify 외의 주소를 쓰면 ON_NETLIFY도)
      KAKAO_JS_KEY 를 넣으면 카카오맵, 비워두면 그림 지도(SVG)로 동작해요.
      카카오맵을 쓰려면 카카오 개발자 콘솔에서
        ① 앱의 카카오맵 API 활성화
@@ -123,7 +123,6 @@ svg.i{width:1.35em;height:1.35em;flex:none}
 .map-ui{position:absolute;inset:0;pointer-events:none;z-index:3}
 .map-ui>*{pointer-events:auto}
 .fab{position:absolute;width:2.7em;height:2.7em;border-radius:50%;border:0;background:var(--paper);box-shadow:0 3px 10px rgba(30,40,51,.22);display:grid;place-items:center;color:var(--ink)}
-.fab.back{top:.7em;left:.7em}
 .cancel-chip{position:absolute;top:.7em;right:.7em;border:0;background:var(--paper);border-radius:99px;box-shadow:0 3px 10px rgba(30,40,51,.22);padding:0 1em;min-height:44px;font-weight:800;font-size:.9em;color:var(--ink)}
 .route-bar{position:absolute;top:.6em;left:.7em;right:.7em;display:flex;align-items:center;gap:.35em;background:var(--paper);border-radius:99px;box-shadow:0 3px 10px rgba(30,40,51,.22);padding:0 1em 0 .1em;min-height:48px;font-weight:800;font-size:.92em}
 .route-bar button{border:0;background:none;width:44px;height:44px;display:grid;place-items:center;color:var(--ink);flex:none}
@@ -214,13 +213,18 @@ svg.i{width:1.35em;height:1.35em;flex:none}
 .car{display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:.6em;border:2px solid var(--line);background:var(--paper);border-radius:14px;padding:.25em .7em;text-align:left;min-height:2.8em}
 .car .cimg{width:2.6em;height:1.9em;display:grid;place-items:center;background:#F4F6F8;border-radius:10px}
 .car .cimg svg{width:2.5em;height:1.67em}
+.car .cname{grid-column:2;min-width:0}
 .car .cname b{display:block;font-size:1em;line-height:1.25}
 .car .cname small{display:block;color:var(--ink-2);font-size:.82em;line-height:1.25}
-.car .cfare{font-weight:800;font-size:1.05em;line-height:1.2;text-align:right}
+.car .cfare{grid-column:3;white-space:nowrap;font-weight:800;font-size:1.05em;line-height:1.2;text-align:right}
 .car .cfare small{display:block;font-weight:700;font-size:.72em;color:var(--ink-2)}
 .car.on{border-color:var(--ink);background:#FFFBE6}
 [data-step=route] .sheet{gap:.45em}
 .trip{font-weight:800;font-size:.95em;color:var(--ink-2)}
+.trip b{color:var(--ink);font-size:1.08em}
+.pick-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 .6em}
+.pick-h span{font-size:.88em;font-weight:800;color:var(--ink-2)}
+.pick-h span b{color:var(--ink)}
 .payrow{border:0;background:none;padding:0;width:100%;min-height:44px;text-align:left;display:flex;align-items:center;gap:.5em;font-size:.85em;color:var(--ink-2);font-weight:600}
 .payrow span{margin-left:auto;font-size:.9em;color:#17704F;font-weight:800}
 
@@ -400,7 +404,7 @@ svg.i{width:1.35em;height:1.35em;flex:none}
 <script>
 'use strict';
 /* =====================================================================
-   1. 설정 — 팀원이 바꿀 곳은 여기뿐이에요
+   1. 설정 — 팀원이 바꿀 곳이에요
    ===================================================================== */
 const CONFIG = {
   // 카카오 JavaScript 키. 비워두면 그림 지도(SVG)
@@ -497,7 +501,7 @@ const approachPath = () => MapCtl.impl===KakaoMap ? roadApproach() : makeApproac
 // 그림 지도 기준 값이에요. 실제 지도에서는 MapCtl.init이 주변 택시를 약 400m로 바꿔요
 let TAXIS = makeTaxis(1);       // 주변 택시
 
-// 받아 둔 경로는 그 출발지 근처에서만 맞아요. 더 멀리 타면 곡선과 계산 요금으로 돌아가요
+// 받아 둔 경로는 그 출발지 근처에서만 맞아요. 더 멀리 타면 함수로 받은 경로(S.live)를 쓰고, 없으면 곡선과 조정 요금이에요
 const PICK_KEEP_KM = 0.15; // 탑승 위치가 경로 출발지에서 이 안이면 받아 둔 도로 경로와 요금을 그대로 써요
 const MAX_PICK_KM = 1;     // 탑승 핀은 지금 계신 곳에서 이만큼까지 옮길 수 있어요
 const routeData = k => {
@@ -505,11 +509,11 @@ const routeData = k => {
   return S.live&&S.live.dest===k&&S.live.at===S.pick ? S.live : null; // 그 탑승 위치로 받아 온 경로
 };
 // 서버 함수로 경로 받기. 실패하면 null이고, 그때는 곡선과 조정 요금으로 그대로 진행해요
-async function fetchRoute(a,b){
+async function fetchRoute(a,to){ // to는 PLACES의 key예요. 함수도 이 장소들만 받아요
   if(!CONFIG.ROUTE_API) return null;
   const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),5000);
   try{
-    const res=await fetch(`${CONFIG.ROUTE_API}?from=${a.lat.toFixed(4)},${a.lon.toFixed(4)}&to=${b.lat.toFixed(4)},${b.lon.toFixed(4)}`,{signal:ctl.signal});
+    const res=await fetch(`${CONFIG.ROUTE_API}?from=${a.lat.toFixed(3)},${a.lon.toFixed(3)}&to=${to}`,{signal:ctl.signal});
     if(!res.ok) return null;
     const r=await res.json();
     const ok=r&&Array.isArray(r.path)&&r.path.length>1&&r.path.every(p=>Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1]))&&r.m>0&&r.s>0&&r.taxi>0;
@@ -521,7 +525,7 @@ let liveReq=0;
 function refreshLive(){ // 지금 탑승 위치에서 목적지까지의 실제 경로를 받아요. 늦게 온 옛 응답은 버려요
   if(!CONFIG.ROUTE_API||S.step!=='origin'||!S.dest||km(S.pick,ROUTES_ORIGIN)<PICK_KEEP_KM||routeData(S.dest)) return;
   const req=++liveReq, at=S.pick, dest=S.dest;
-  fetchRoute(at,PLACES[dest]).then(r=>{ if(r&&req===liveReq&&S.step==='origin'&&S.pick===at&&S.dest===dest){ S.live={dest,at,...r}; showPick(); } });
+  fetchRoute(at,dest).then(r=>{ if(r&&req===liveReq&&S.step==='origin'&&S.pick===at&&S.dest===dest){ S.live={dest,at,...r}; showPick(); } });
 }
 const toPts = p => p.map(([lat,lon])=>({lat,lon}));
 function routePath(k){
@@ -529,7 +533,7 @@ function routePath(k){
   // 그림 지도의 도로는 실제 도로가 아니라서, 도로 경로는 실제 지도에서만 그려요. 양 끝은 출발지·도착지 좌표로 이어요
   return r && MapCtl.impl===KakaoMap ? [S.pick,...toPts(r.path),PLACES[k]] : curve(S.pick, PLACES[k]);
 }
-function fareOf(k){ // 경기도 중형택시 요금 체계를 본뜬 연습용 계산
+function fareOf(k){ // 받은 경로의 값 → 거리 비율로 조정한 값 → 경기도 중형택시를 본뜬 연습용 계산 순서로 써요
   const r = routeData(k), base = ROUTES[k], P = PLACES[k], ref = km(ROUTES_ORIGIN,P);
   if(r) return {f:r.taxi, min:Math.max(1,Math.round(r.s/60)), km:(r.m/1000).toFixed(1)};
   // 핀을 조금 옮긴 경우: 받아 둔 경로를 거리 비율로 늘이거나 줄여요. 그래야 멀어졌는데 요금이 내려가지 않아요
@@ -716,7 +720,7 @@ const SvgMap = {
       g.push(`<g transform="translate(${q.x} ${q.y})"><animateTransform attributeName="transform" type="translate" values="${q.x} ${q.y};${q.x+dx} ${q.y+dy};${q.x} ${q.y}" dur="${3+i*.7}s" repeatCount="indefinite"/><g transform="scale(${k*.9})">${cabParts()}</g></g>`)});
     // 도착지
     if(v.dest){const q=prj(PLACES[v.dest]);g.push(`<g transform="translate(${q.x} ${q.y}) scale(${k})"><path d="M0 0c-6-7-10-11-10-16a10 10 0 0 1 20 0c0 5-4 9-10 16z" fill="#C8492F" stroke="#fff" stroke-width="1.5"/><circle cy="-16" r="3.6" fill="#fff"/></g>`);g.push(txt(PLACES[v.dest].n,q.x,q.y-31*k,10.5,'#C8492F'))}
-    // 출발지(우리집)
+    // 탑승 위치
     if(v.origin){g.push(`<circle cx="${O.x}" cy="${O.y}" r="${12*k}" fill="rgba(44,119,186,.18)"><animate attributeName="r" values="${8*k};${15*k};${8*k}" dur="2s" repeatCount="indefinite"/></circle><circle cx="${O.x}" cy="${O.y}" r="${6*k}" fill="#2C77BA" stroke="#fff" stroke-width="${2.4*k}"/>`)}
     // 내 택시
     if(this.carPos){const q=prj(this.carPos);g.push(`<g id="svgcar" transform="translate(${q.x.toFixed(1)} ${q.y.toFixed(1)}) scale(${k.toFixed(3)})"><g transform="scale(1.25)">${cabParts(myCar().c)}</g></g>`)}
@@ -789,7 +793,7 @@ const KakaoMap = {
     // 위쪽 여백은 핀과 이름표 자리예요. 낮은 지도에서는 이름표를 숨기고(이름은 바로 아래 시트에 있어요) 핀 자리만 남겨요
     this.map.setBounds(b,v.bar&&h>=LOW_MAP_PX?96:(short?Math.min(38,h*.45):52),32,Math.min(24,h*.12),32); // 출발·도착 줄이 있으면 핀을 가리지 않게 위를 더 비워요
   },
-  // 목적지 고르기와 탑승 위치 고르기에서, 스크롤이 필요 없을 때만 지도를 움직일 수 있어요.
+  // 목적지 고르기는 스크롤이 필요 없을 때만, 탑승 위치 고르기는 항상 지도를 움직일 수 있어요.
   // 그 밖에는 내 택시가 화면 밖으로 나가지 않게, 또 지도 위 손가락으로도 화면이 스크롤되게 터치를 지도에 전달하지 않아요
   lock(){
     const v=this.view; if(!v) return;
@@ -852,7 +856,7 @@ const pickLabel = () => km(S.pick,HOME)<0.01 ? `현재 위치 · ${esc(HOME.a)}`
 function pickRows(){
   const fr=fareOf(S.dest), m=Math.round(km(S.pick,HOME)*1000);
   return `<div class="ft-r"><i class="dot s"></i><span><small>탑승 위치${m>=10?` · 지금 위치에서 약 ${m}m`:''}</small><b>${pickLabel()}</b></span></div>
-    <div class="ft-r extra"><i class="dot e"></i><span><small>도착 · 약 ${fr.km}km · 예상 ${won(carFare(fr.f,S.car))}</small><b>${PLACES[S.dest].n}</b></span></div>`;
+    <div class="ft-r extra"><i class="dot e"></i><span><small>예상 요금 · 약 ${fr.km}km</small><b class="tabnum">${won(carFare(fr.f,S.car))}</b></span></div>`;
 }
 const barFrom=()=>km(S.pick,HOME)<0.01?'현재 위치':'고른 위치';
 const showPick=()=>{ const e=$('pick-ft'), f=$('bar-from'); if(e) e.innerHTML=pickRows(); if(f) f.textContent=barFrom(); };
@@ -871,8 +875,8 @@ function setPick(p){
   }catch(e){}
 }
 function tryPick(p){
-  if(km(p,HOME)>MAX_PICK_KM){ toast(`탑승 위치는 지금 계신 곳에서 ${MAX_PICK_KM}km 안에서 골라요`); MapCtl.impl.refit(); return; }
-  setPick(p);
+  if(km(p,HOME)>MAX_PICK_KM){ toast(`탑승 위치는 지금 계신 곳에서 ${MAX_PICK_KM}km 안에서 골라요`); MapCtl.impl.refit(); return false; }
+  setPick(p); return true;
 }
 // 그림 지도에서 탑승 위치 고르기: 끌면 지도가 따라오고, 누르면 그 자리로 옮겨요
 let svgDrag=null;
@@ -952,12 +956,12 @@ function sheetHTML(){
   case 'home': case 'search': return `${GRAB()}<div class="tx-search-wrap"><button class="tx-search${tg(1)}" data-a="open-search">${I('search')}<span>어디로 갈까요?</span></button><button class="mic-ic" data-a="open-mic" aria-label="말로 찾기">${I('mic')}</button></div>
     <div class="res-h">최근 목적지</div>
     <div class="quick">${RECENT.map(k=>`<button data-a="pick" data-v="${k}">${I(PLACES[k].kind==='st'?'station':'clock')}${PLACES[k].n}</button>`).join('')}</div>`;
-  case 'route': return `${GRAB()}<div class="trip tabnum">약 ${fr.km}km · 약 ${fr.min}분 걸려요</div>
+  case 'route': return `${GRAB()}<div class="trip tabnum">도착 <b>${P.n}</b> · 약 ${fr.km}km · 약 ${fr.min}분</div>
     <div class="cars">${CARS.map(c=>`<button class="car${S.car===c.k?' on':''}" data-a="car" data-v="${c.k}" aria-pressed="${S.car===c.k}">
       <span class="cimg">${CAR3D(VEHICLES[c.k].c)}</span><span class="cname"><b>${c.t}</b><small>${c.eta}분 뒤 도착 · ${c.d}</small></span>
       <span class="cfare tabnum"><small>예상</small>${won(carFare(fr.f,c.k))}</span></button>`).join('')}</div>
     <button class="payrow" data-a="pay-open" aria-label="결제 수단 바꾸기">${I('card')}${S.pay==='card'?'연습카드 ···· 0000':'기사님에게 직접 결제'}<span>${S.pay==='card'?'내릴 때 자동결제':'내릴 때 직접 내요'} ›</span></button>`;
-  case 'origin': return `${GRAB()}<h3>어디서 탈까요?</h3>
+  case 'origin': return `${GRAB()}<div class="pick-h"><h3>어디서 탈까요?</h3><span>도착 <b>${P.n}</b></span></div>
     <div class="ft" id="pick-ft">${pickRows()}</div>
     <p class="small muted extra">지도를 움직이거나 누르면 핀이 옮겨져요. 찾기 쉬운 곳으로 골라 봐요.</p>`;
   case 'calling': return `<div class="radar">${I('taxi')}</div>
@@ -1160,6 +1164,7 @@ const markGuide=()=>{ if(S.mode==='practice'&&PREF.guide&&!WAIT[S.step]) S.sk[SK
 const tickStep=()=>{ const now=flowNow(); if(S.stepAt!=null&&!WAIT[S.step]) S.sk[SKILL_OF[S.step]].ms+=now-S.stepAt; S.stepAt=now; }; // 기다리는 단계를 뺀 단계별 시간
 function setStep(st){
   haltStep(); stopSpeech(); tickStep();
+  if(toastIsMistake) hideMessages(); // 고친 뒤에도 "다시 골라 봐요"가 남지 않게 해요
   S.step=st; S.hintOpen=false; S.listening=false; S.sheetDown=false; sheetDrag=null;
   markGuide();
   render();
@@ -1178,7 +1183,7 @@ let lastMist={key:'',at:-1e9};
 function mistake(msg,key){ // 같은 곳을 손이 떨려 연달아 누른 건 한 번으로 세요
   const now=performance.now(), dup=key===lastMist.key&&now-lastMist.at<800; lastMist={key,at:now};
   if(!dup){ S.mist++; S.sk[SKILL_OF[S.step]].m++; if(PREF.voice) say(msg); }
-  toast(msg);
+  toast(msg); toastIsMistake=true;
 }
 function begin(){ S.t0=flowNow(); S.screen='ride'; MapCtl.lastKey=null; setStep('home'); }
 
@@ -1242,14 +1247,15 @@ function exitNow(){
    ===================================================================== */
 function placeMsg(el){ const b=document.querySelector('.prac-banner').getBoundingClientRect(), p=$('phone'); el.style.top=(b.bottom-p.getBoundingClientRect().top-p.clientTop+6)+'px'; }
 function hideMessages(){ clearTimeout(toast._t); clearTimeout(noti._t); $('toast').hidden=true; $('noti').hidden=true; }
-function toast(m){ hideMessages(); const t=$('toast'); t.textContent=m; placeMsg(t); t.hidden=false; toast._t=setTimeout(()=>t.hidden=true, Math.max(5000,m.length*170)); }
+let toastIsMistake=false;
+function toast(m){ hideMessages(); toastIsMistake=false; const t=$('toast'); t.textContent=m; placeMsg(t); t.hidden=false; toast._t=setTimeout(()=>t.hidden=true, Math.max(5000,m.length*170)); }
 function noti(title,body){ hideMessages(); const n=$('noti'); n.innerHTML=`<span class="ni">${I('taxi')}</span><div><b>${title}</b><p>${body}</p></div>`; placeMsg(n); n.hidden=false; noti._t=setTimeout(()=>n.hidden=true,5000); }
 function stopSpeech(){ try{ speechSynthesis.cancel(); }catch(e){} }
 function say(t,force){ if((!PREF.voice&&!force)||!t) return; try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ko-KR';u.rate=.9;speechSynthesis.speak(u)}catch(e){} }
 
 /* 안내창: 열려 있는 동안 뒤 화면은 터치도 키보드도 닿지 않아요 */
 let modalFrom=null;
-function openModal(html,label){ modalFrom=document.activeElement; $('modal').innerHTML=html; $('modal').setAttribute('aria-label',label); $('modal').hidden=false; $('app').inert=true; $('modal').querySelector('[data-a=modal-no]').focus(); }
+function openModal(html,label){ lastStepAt=performance.now(); modalFrom=document.activeElement; $('modal').innerHTML=html; $('modal').setAttribute('aria-label',label); $('modal').hidden=false; $('app').inert=true; $('modal').querySelector('[data-a=modal-no]').focus(); }
 function closeModal(){ $('modal').hidden=true; $('app').inert=false; lastStepAt=performance.now(); const f=modalFrom; modalFrom=null; if(f&&f.isConnected) quietFocus(f); }
 const confirmHTML=(title,body,noText,yesAction,yesText)=>`<div class="modal-in"><h3>${title}</h3><p>${body}</p><div class="row2"><button class="btn ghost" data-a="modal-no">${noText}</button><button class="btn dark" data-a="${yesAction}">${yesText}</button></div></div>`;
 
@@ -1270,12 +1276,14 @@ const A = {
   car:v=>{S.car=v;render()},
   'car-ok':()=>{ if(S.missionOn&&S.car!=='일반'){ mistake('미션은 "일반택시"예요. 일반택시를 골라 봐요','car-ok'); return; } setStep('origin'); refreshLive(); },
   'pick-back':()=>setStep('route'),
-  call:()=>{ S.plates=plateOpts(S.car); S.approach=approachPath(); setStep('calling');
+  call:()=>{ // 지도가 멈추기 전에 눌러도 끌어 놓은 자리에서 타게, 호출 직전에 지도 가운데를 다시 읽어요
+    if(MapCtl.impl===KakaoMap&&KakaoMap.view&&KakaoMap.view.pick){ const c=KakaoMap.map.getCenter(); if(!tryPick({lat:c.getLat(),lon:c.getLng()})) return; }
+    S.plates=plateOpts(S.car); S.approach=approachPath(); setStep('calling');
     // 핀을 멀리 옮겼으면 기사님이 오는 길도 그 위치 기준으로 받아요. 호출 중(4초) 안에 오면 써요
-    if(!routeData('mpst')&&MapCtl.impl===KakaoMap){ const at=S.pick; fetchRoute(at,PLACES.mpst).then(r=>{ if(r&&S.step==='calling'&&S.pick===at) S.approach=[...toPts(r.path).reverse(),at]; }); } },
+    if(!routeData('mpst')&&MapCtl.impl===KakaoMap){ const at=S.pick; fetchRoute(at,'mpst').then(r=>{ if(r&&S.step==='calling'&&S.pick===at) S.approach=[...toPts(r.path).reverse(),at]; }); } },
   cancel:()=>{setStep('route');toast('호출을 취소했어요. 다시 불러볼까요?')},
   'cancel-ask':()=>{ pauseFlow('modal'); stopSpeech();
-    openModal(confirmHTML('기사님이 오고 있어요. 취소할까요?','취소하고 다시 부르면 더 먼 택시가 올 수 있어요. 택시 종류에 따라 배차 뒤 시간이 지나 취소하면 수수료가 나오기도 해요. 일반택시는 없어요.','아니요','cancel-yes','호출 취소하기'),'호출 취소 확인'); },
+    openModal(confirmHTML('기사님이 오고 있어요. 취소할까요?','취소하고 다시 부르면 더 먼 택시가 올 수 있어요. 실제 앱에서는 택시 종류에 따라 취소 수수료가 나오기도 하니 안내를 꼭 읽어요. 연습이라 돈은 나가지 않아요.','아니요','cancel-yes','호출 취소하기'),'호출 취소 확인'); },
   'cancel-yes':()=>{ closeModal(); resumeFlow('modal'); A.cancel(); },
   'pay-open':()=>{ openModal(`<div class="modal-in"><h3>어떻게 낼까요?</h3><p>카드를 등록해 두면 내릴 때 자동으로 결제돼요. 직접 내는 방법도 있어요.</p><div class="row2"><button class="btn ghost" data-a="pay-set" data-v="direct">기사님에게 직접</button><button class="btn dark" data-a="pay-set" data-v="card">연습카드 자동결제</button></div><button class="link" data-a="modal-no">닫기</button></div>`,'결제 수단 고르기'); },
   'pay-set':v=>{ closeModal(); S.pay=v==='direct'?'direct':'card'; render(); },
