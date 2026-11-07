@@ -328,8 +328,8 @@ svg.i{width:1.35em;height:1.35em;flex:none}
 #map.on-kakao~.map-ui>.center-pin{top:calc(50% - 9px)}
 #map.short~.map-ui>.center-pin b{visibility:hidden}
 #map.low~.map-ui>.center-pin b,#map.low .k-pin.d b{visibility:hidden}
-#map.short~.map-ui>.route-bar{right:auto;padding:0;width:48px;justify-content:center}
-#map.short~.map-ui>.route-bar>span,#map.short~.map-ui>.route-bar>i{display:none}
+#map.nobar~.map-ui>.route-bar{right:auto;padding:0;width:48px;justify-content:center}
+#map.nobar~.map-ui>.route-bar>span,#map.nobar~.map-ui>.route-bar>i{display:none}
 #map.pickable{cursor:grab}
 #map.pickable>svg{touch-action:none}
 .k-taxi svg{width:24px;height:31px;display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
@@ -702,7 +702,7 @@ const SvgMap = {
     // 글자·핀 크기가 확대 비율(k)에 따라 커지므로, 여백도 k에 맞춰 두 번 계산해요
     let k=1, box;
     for(let pass=0;pass<3;pass++){
-      const x0=Math.min(...xs)-44*k, x1=Math.max(...xs)+44*k, y0=Math.min(...ys)-(this.view&&this.view.bar?96:58)*k, y1=Math.max(...ys)+44*k;
+      const x0=Math.min(...xs)-44*k, x1=Math.max(...xs)+44*k, y0=Math.min(...ys)-(this.view&&this.view.bar&&this.el.clientHeight>=BAR_MAP_PX?96:58)*k, y1=Math.max(...ys)+44*k;
       let w=Math.max(x1-x0, ps.length===1?170:230), h=Math.max(y1-y0, ps.length===1?140:190);
       if(w/h<ar) w=h*ar; else h=w/ar;
       const cx=(x0+x1)/2, cy=(y0+y1)/2;
@@ -819,7 +819,7 @@ const KakaoMap = {
     }
     const b=new kakao.maps.LatLngBounds(); v.fit.forEach(p=>b.extend(this.LL(p)));
     // 위쪽 여백은 핀과 이름표 자리예요. 낮은 지도에서는 이름표를 숨기고(이름은 바로 아래 시트에 있어요) 핀 자리만 남겨요
-    this.map.setBounds(b,v.bar&&!short?Math.min(96,h*.5):(short?Math.min(38,h*.45):52),32,Math.min(24,h*.12),32); // 출발·도착 줄이 있으면 핀을 가리지 않게 위를 더 비워요
+    this.map.setBounds(b,v.bar&&h>=BAR_MAP_PX?Math.min(96,h*.5):(short?Math.min(38,h*.45):52),32,Math.min(24,h*.12),32); // 출발·도착 줄이 있으면 핀을 가리지 않게 위를 더 비워요
   },
   // 목적지 고르기는 스크롤이 필요 없을 때만, 탑승 위치 고르기는 항상 지도를 움직일 수 있어요.
   // 그 밖에는 내 택시가 화면 밖으로 나가지 않게, 또 지도 위 손가락으로도 화면이 스크롤되게 터치를 지도에 전달하지 않아요
@@ -836,10 +836,11 @@ const KakaoMap = {
 };
 
 const SHORT_MAP_PX = 130; // 지도가 이보다 낮으면 목적지 이름표를 숨기고 핀 자리만 남겨요
+const BAR_MAP_PX = 170;   // 지도가 이보다 낮으면 출발·도착 줄을 뒤로 버튼만 남겨서 도착 핀을 가리지 않게 해요. 도착지 이름은 시트에 있어요
 const LOW_MAP_PX = 240;   // 지도가 이보다 낮으면 핀 이름표를 숨겨서 출발·도착 줄과 겹치지 않게 해요
 const MapCtl = {
   impl:SvgMap, lastKey:null, ready:false, holdUntil:0, el:null,
-  sizeCls(){ const h=this.el.clientHeight; this.el.classList.toggle('short',h<SHORT_MAP_PX); this.el.classList.toggle('low',h<LOW_MAP_PX); },
+  sizeCls(){ const h=this.el.clientHeight; this.el.classList.toggle('short',h<SHORT_MAP_PX); this.el.classList.toggle('low',h<LOW_MAP_PX); this.el.classList.toggle('nobar',h<BAR_MAP_PX); },
   hold(){ this.holdUntil=performance.now()+600; }, // 시트를 움직이는 동안은 지도 초점을 그대로 둬요
   async init(el){
     this.el=el;
